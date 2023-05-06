@@ -29,6 +29,11 @@ def firws(m, f , w , t = None):
             b = fspecinv(b) #bandpass        
     return b
 
+def fspecinv(b):
+    b = -b
+    b[int((b.shape[0]-1)/2)] = b[int((b.shape[0]-1)/2)]+1
+    return b
+
 def fkernel(m, f, w):
     m = np.arange(-m/2, (m/2)+1)
     b = np.zeros((m.shape[0]))
