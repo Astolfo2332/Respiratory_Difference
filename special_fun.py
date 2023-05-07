@@ -73,8 +73,8 @@ def custom_filter(fs,low,high):
     return low_pass,high_pass
 
 def welch_a(data,rate):
-    f,Pxx=signal.welch(data[0],data[1],"hamming",data[0].shape[0]*rate[0],data[0].shape[0]*rate[1],scaling="density")
-    return f,Pxx
+    f,Pxx=signal.welch(data[0],data[1],"hamming",rate[0],rate[1],scaling="density")
+    return Pxx[f<1000]
 
 
 def wnoisest(coeff):
@@ -99,7 +99,7 @@ def wthresh(coeff):
         y.append(np.multiply(coeff[i],np.abs(coeff[i])>(thr*s[i])))
     return y
 
-def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia):
+def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchrate):
     """El regreso de donde estan los archivos?"""
     sano_list=[]
     crackles_list=[]
@@ -111,7 +111,7 @@ def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia):
         a=dic[lallave]
         a=to_n(sr,a)
         for i in a:
-            _,x=welch_a([y[i[0]:i[1]],sr],[0.025,0.0125])
+            x=welch_a([y[i[0]:i[1]],sr],[welchrate[0],welchrate[1]])
             b.append(x)
         return b
     las_llaves=list(datos.keys())
@@ -125,4 +125,15 @@ def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia):
         if i in datos_silbancia:    
             wheezes_list.append(el_agregador(y,sr,datos_silbancia,i))
     return sano_list,crackles_list,wheezes_list
-            
+
+
+def el_promediador(datos_sano,datos_crepitancia,datos_silbancia):
+    a=[datos_sano,datos_crepitancia,datos_silbancia]
+    proms=[]
+    for n in a:
+        pro=[]
+        for i in range(len(n)):
+            pro.append(np.mean(n[i],axis=0))
+        pro=np.array(pro)
+        proms.append(np.mean(pro,axis=0))
+    return proms
