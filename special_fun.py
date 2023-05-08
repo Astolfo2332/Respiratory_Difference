@@ -5,6 +5,7 @@ import numpy as np
 import librosa
 import scipy.signal as signal
 import pywt
+import matplotlib.pyplot as plt
 from scipy.signal import kaiserord, lfilter, firwin, freqz
 def el_discriminador(lista_archivos,ruta_carpeta):
     """Minorías"""
@@ -75,6 +76,7 @@ def custom_filter(fs,low,high):
 def welch_a(data,rate):
     f,Pxx=signal.welch(data[0],data[1],"hamming",rate[0],rate[1],scaling="density")
     return Pxx[f<1000]
+    
 
 
 def wnoisest(coeff):
@@ -101,6 +103,9 @@ def wthresh(coeff):
 
 def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchrate):
     """El regreso de donde estan los archivos?"""
+    sano_welch_list=[]
+    crackles_welch_list=[]
+    wheezes_welch_list=[]
     sano_list=[]
     crackles_list=[]
     wheezes_list=[]
@@ -108,23 +113,32 @@ def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchr
         return (t*sr//1).astype(int)
     def el_agregador(y,sr,dic,lallave):
         b=[]
+        b_sound=[]
         a=dic[lallave]
         a=to_n(sr,a)
         for i in a:
-            x=welch_a([y[i[0]:i[1]],sr],[welchrate[0],welchrate[1]])
+            sound=y[i[0]:i[1]]
+            x=welch_a([sound,sr],[welchrate[0],welchrate[1]])
             b.append(x)
-        return b
+            b_sound.append(sound)
+        return b,b_sound
     las_llaves=list(datos.keys())
     for i in las_llaves:
         y=datos[i]
         y,sr=muchos_datos(y)
         if i in datos_sano:
-            sano_list.append(el_agregador(y,sr,datos_sano,i))
-        if i in datos_crepitancia:    
-            crackles_list.append(el_agregador(y,sr,datos_crepitancia,i))
-        if i in datos_silbancia:    
-            wheezes_list.append(el_agregador(y,sr,datos_silbancia,i))
-    return sano_list,crackles_list,wheezes_list
+            guelch,sound=el_agregador(y,sr,datos_sano,i)
+            sano_welch_list.append(guelch)
+            sano_list.append(sound)
+        if i in datos_crepitancia:   
+            guelch,sound=el_agregador(y,sr,datos_crepitancia,i)
+            crackles_welch_list.append(guelch)
+            crackles_list.append(sound)
+        if i in datos_silbancia: 
+            guelch,sound=el_agregador(y,sr,datos_silbancia,i)
+            wheezes_welch_list.append(guelch)
+            wheezes_list.append(sound)
+    return sano_list,crackles_list,wheezes_list,sano_welch_list, crackles_welch_list,wheezes_welch_list
 
 
 def el_promediador(datos_sano,datos_crepitancia,datos_silbancia):
@@ -137,3 +151,58 @@ def el_promediador(datos_sano,datos_crepitancia,datos_silbancia):
         pro=np.array(pro)
         proms.append(np.mean(pro,axis=0))
     return proms
+
+def el_fraccionador(data,fmin=75,fmax=250):
+    new_list=[]
+    for lista in data:
+        new_data=[]
+        for paciente in lista:
+            new_ciclo=[]
+            for ciclo in paciente:
+                f=np.linspace(0,1000,len(ciclo))
+                r=(fmax>f) & (fmin>f)
+                new_ciclo.append(ciclo[r])
+            new_data.append(new_ciclo)
+        new_list.append(new_data)
+    return new_list
+
+def el_finalizador(data,data_sound,fmin=75,fmax=250):
+    def sumatoria(data_frac):
+        for i in data_frac:
+            sum_datos.append(np.sum(i))
+    def mediana(data):
+        for i in data:
+            mediana_datos.append(np.median(i))
+    def varianza(sound_data,estado):
+        for i in sound_data:
+            var_datos.append(np.var(i))
+            fin_estado.append(estado)
+    data_frac=el_fraccionador(data,fmin,fmax)
+    estado=["Healthy","Crackles","Wheezes"]
+    fin_estado=[]
+    sum_datos=[]
+    mediana_datos=[]
+    var_datos=[]
+    for i in range(len(estado)):
+        status=estado[i]
+        a_data=data[i]
+        sound_data=data_sound[i]
+        a_data_frac=data_frac[i]
+        for n in range(len(a_data)):
+            sumatoria(a_data_frac[n])
+            mediana(a_data[n])
+            varianza(sound_data[n],status)
+    d={}
+    d["Estado"]=fin_estado
+    d["Sumatoria"]=sum_datos
+    d["Mediana"]=mediana_datos
+    d["Varianza"]=var_datos
+    d=pd.DataFrame(d)
+    return d
+
+def grafiquelo(promedios,xlim):
+    f=np.linspace(0,1000,len(promedios[0]))
+    for i in promedios:
+        plt.plot(f,i)
+    plt.xlim(xlim)
+    plt.legend(["Sanos","Crackles","Wheezes"])
