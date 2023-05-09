@@ -41,7 +41,7 @@ def sonido_probando123(lista_archivos,ruta_carpeta):
             sound_list[os.path.join(ruta_carpeta,archivo)]=[y,sr]
     return sound_list
 
-def muchos_datos(data,low=2000,high=100):
+def muchos_datos(data,low=2000,high=100,nivel=10):
     sr=data[1]
     data=data[0]
     low_pass,high_pass=custom_filter(sr,low,high)
@@ -49,7 +49,7 @@ def muchos_datos(data,low=2000,high=100):
     y_l = signal.filtfilt(low_pass, 1, y_h)
     y = np.asfortranarray(y_l)
     a=int(np.log2(data.shape[0]))
-    data_wavelet = pywt.wavedec( y_l, 'db6', level=10 )  
+    data_wavelet = pywt.wavedec( y_l, 'db6', level=nivel )  
     details = data_wavelet[1:]
     details_t = wthresh(details)
     rec=list()
@@ -101,7 +101,7 @@ def wthresh(coeff):
         y.append(np.multiply(coeff[i],np.abs(coeff[i])>(thr*s[i])))
     return y
 
-def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchrate):
+def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchrate,level):
     """El regreso de donde estan los archivos?"""
     sano_welch_list=[]
     crackles_welch_list=[]
@@ -118,14 +118,19 @@ def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchr
         a=to_n(sr,a)
         for i in a:
             sound=y[i[0]:i[1]]
-            x=welch_a([sound,sr],[welchrate[0],welchrate[1]])
-            b.append(x)
-            b_sound.append(sound)
+            if len(sound)>39999:
+                sound=sound[0:40000]
+                x=welch_a([sound,sr],[welchrate[0],welchrate[1]])
+                b.append(x)
+                b_sound.append(sound)
+            else:
+                b.append(np.nan)
+                b_sound.append(np.nan)
         return b,b_sound
     las_llaves=list(datos.keys())
     for i in las_llaves:
         y=datos[i]
-        y,sr=muchos_datos(y)
+        y,sr=muchos_datos(y,nivel=level)
         if i in datos_sano:
             guelch,sound=el_agregador(y,sr,datos_sano,i)
             sano_welch_list.append(guelch)
@@ -159,9 +164,9 @@ def el_fraccionador(data,fmin=75,fmax=250):
         for paciente in lista:
             new_ciclo=[]
             for ciclo in paciente:
-                f=np.linspace(0,1000,len(ciclo))
-                r=(fmax>f) & (fmin>f)
-                new_ciclo.append(ciclo[r])
+                    f=np.linspace(0,1000,len(ciclo))
+                    r=(fmax>f) & (fmin>f)
+                    new_ciclo.append(ciclo[r])
             new_data.append(new_ciclo)
         new_list.append(new_data)
     return new_list
@@ -200,9 +205,17 @@ def el_finalizador(data,data_sound,fmin=75,fmax=250):
     d=pd.DataFrame(d)
     return d
 
-def grafiquelo(promedios,xlim):
+def grafiquelo(promedios,xlim,ylim):
     f=np.linspace(0,1000,len(promedios[0]))
     for i in promedios:
         plt.plot(f,i)
     plt.xlim(xlim)
+    plt.ylim(ylim)
     plt.legend(["Sanos","Crackles","Wheezes"])
+
+def el_filtrador_2(data):
+    new_data=[]
+    for i in data:
+        primero=[[val for val in sublist if not np.sum(np.isnan(val))==1] for sublist in i]
+        new_data.append([val for val in primero if val!=[]])
+    return new_data
