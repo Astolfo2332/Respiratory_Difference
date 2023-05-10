@@ -48,7 +48,6 @@ def muchos_datos(data,low=2000,high=100,nivel=10):
     y_h = signal.filtfilt(high_pass, 1, data)
     y_l = signal.filtfilt(low_pass, 1, y_h)
     y = np.asfortranarray(y_l)
-    a=int(np.log2(data.shape[0]))
     data_wavelet = pywt.wavedec( y_l, 'db6', level=nivel )  
     details = data_wavelet[1:]
     details_t = wthresh(details)
@@ -69,7 +68,7 @@ def custom_filter(fs,low,high):
         N_hp+=1
     if N_lp%2==0:
         N_lp+=1
-    low_pass=firwin(N_lp, low/nyq ,window=('kaiser',7.85))
+    low_pass=firwin(N_hp, low/nyq ,window=('kaiser',7.85),pass_zero="lowpass")
     high_pass=firwin(N_hp, high/nyq ,pass_zero="highpass",window=('kaiser',7.85))
     return low_pass,high_pass
 
@@ -110,7 +109,7 @@ def el_discriminador_2(datos,datos_sano,datos_crepitancia,datos_silbancia,welchr
     crackles_list=[]
     wheezes_list=[]
     def to_n(sr,t):
-        return (t*sr//1).astype(int)
+        return ((t*sr)//1).astype(int)
     def el_agregador(y,sr,dic,lallave):
         b=[]
         b_sound=[]
